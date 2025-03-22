@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Union
 
@@ -20,7 +20,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 api_key = os.environ['MISTRAL_API_KEY']
-print(api_key)
 client = Mistral(api_key=api_key)
 
 # processed_pdf_url = client.ocr.process(
@@ -108,6 +107,27 @@ def get_video_transcript(url):
             "content": [
                 {
                     "type": "text",
+                    "text": "Based on the given video transcript text, give me 3 genres/topics/sub-topics that this video can be categorized in. The result should only be a comma separated string of the 3 genres."
+                },
+                {
+                    "type": "text",
+                    "text": transcript_text
+                }
+            ]
+        }
+    ]
+    chat_response = client.chat.complete(
+        model="mistral-small-latest",
+        messages=messages
+    )
+    genres = chat_response.choices[0].message.content
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
                     "text": f"Here's the 10 most important points from the video transcript: \n{raw_result} \nAttach the starting timestamp of these points from the transcript json, and return the result in yaml."
                 },
                 {
@@ -122,10 +142,13 @@ def get_video_transcript(url):
         messages=messages
     )
     raw_response = chat_response.choices[0].message.content
-    response_yaml = "\n".join(raw_response.split('\n')[1:-1])
+    response_yaml_string = "\n".join(raw_response.split('\n')[1:-1])
 
-    print(response_yaml)
-    return response_yaml
+    result = {
+        'summary': response_yaml_string,
+        'genres': genres
+    }
+    return result
 
 
 # Download pdf locally (~/.kai/pdfs/)
@@ -175,6 +198,27 @@ def get_pdf_highlights(doc_id):
             "content": [
                 {
                     "type": "text",
+                    "text": "Based on the given pdf data, give me 3 genres/topics/sub-topics that this video can be categorized in. The result should only be a comma separated string of the 3 genres."
+                },
+                {
+                    "type": "text",
+                    "text": json.dumps(ocr_response.model_dump_json())
+                }
+            ]
+        }
+    ]
+    chat_response = client.chat.complete(
+        model="mistral-small-latest",
+        messages=messages
+    )
+    genres = chat_response.choices[0].message.content
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
                     "text": "Read all the pages content and give me the 15 most important technical points, along with their page numbers in a json array format."
                 },
                 {
@@ -210,9 +254,13 @@ def get_pdf_highlights(doc_id):
         messages=messages
     )
     raw_response = chat_response.choices[0].message.content
-    response_yaml = "\n".join(raw_response.split('\n')[1:-1])
+    response_yaml_string = "\n".join(raw_response.split('\n')[1:-1])
 
-    return response_yaml
+    result = {
+        'summary': response_yaml_string,
+        'genres': genres
+    }
+    return result
 
 
 @app.get("/")
@@ -223,13 +271,13 @@ def hello():
 def get_pdf_blob(file_name: str):
     return serve_pdf(file_name)
 
-@app.post("/submission/pdf")
+@app.post("/submission/pdf", response_class=JSONResponse)
 def get_pdf_contents(submission: Submission):
     pdf_id = download_pdf(submission.title, submission.url)
     highlights = get_pdf_highlights(pdf_id)
     return highlights
 
-@app.post("/submission/youtube")
+@app.post("/submission/youtube", response_class=JSONResponse)
 def get_youtube_transcript(submission: Submission):
     transcript = get_video_transcript(submission.url)
     return transcript
