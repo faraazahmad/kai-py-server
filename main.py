@@ -240,7 +240,7 @@ def get_pdf_highlights(doc_id):
             "content": [
                 {
                     "type": "text",
-                    "text": f"Here's the 15 most important points from the document: \n{raw_result} \nAttach the starting page of these points from the document json, and return the result in yaml. The yaml key for the point should be 'text', and for the page it should be 'page'."
+                    "text": f"Here's the 15 most important points from the document: \n{raw_result} \nAttach the starting page of these points from the document json, and return the result in yaml. The yaml key for the point should be 'text', and for the page it should be 'page'. The colons and dashes need to be escaped in the string."
                 },
                 {
                     "type": "document_url",
